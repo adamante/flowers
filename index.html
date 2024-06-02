@@ -1,145 +1,149 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flower Animation</title>
-    <style>
-        body { margin: 0; overflow: hidden; background-color: #87CEEB; }
-        canvas { display: block; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generative Art</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.min.js"></script>
-    <script>
-        let scene, camera, renderer, flowers = [];
-let numFlowers = 50;
-let scrollSpeed = 0.01;
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+  <script>
+    let totalNumberOfDots = 350;
+    let scale = 10;
+    let guiParams = {
+      size: 5, // Default size
+      shape: 4,
+      rotationSpeed: 0.05, // Default rotation speed
+      loopDensity: 2, // Default loop density
+      minFramerate: 30 // Minimum framerate for smooth display
+    };
+    let gui;
+    let spirals = [];
+    let rotationDirection = 1;
+    let lastUpdateTime = 0;
 
-init();
-animate();
-
-function init() {
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setClearColor(0x87CEEB, 1); // Light blue sky background
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    for (let i = 0; i < numFlowers; i++) {
-        let flower = createFlower();
-        flower.position.set(
-            (Math.random() - 0.5) * window.innerWidth / 10,
-            (Math.random() - 0.5) * window.innerHeight / 10,
-            Math.random() * 10
-        );
-        flowers.push(flower);
-        scene.add(flower);
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      gui = new dat.GUI();
+      setupGui();
+      colorMode(HSB);
+      angleMode(DEGREES);
     }
 
-    camera.position.z = 20;
+    function draw() {
+      background(0);
+      blendMode(BLEND); // Reset blend mode
+      fill(0, 10); // Semi-transparent black to create trail effect
+      rect(0, 0, width, height); // Draw a semi-transparent rectangle to create trail
+      blendMode(ADD); // Set blend mode to ADD for brighter colors
 
-    window.addEventListener('resize', onWindowResize, false);
+      let currentTime = millis();
+      let deltaTime = (currentTime - lastUpdateTime) / 1000;
+      lastUpdateTime = currentTime;
+      let framerate = frameRate();
+      let smoothDisplay = framerate >= guiParams.minFramerate;
 
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 10, 7.5);
-    scene.add(light);
-    const ambientLight = new THREE.AmbientLight(0x404040);
-    scene.add(ambientLight);
-}
-
-function createFlower() {
-    let flower = new THREE.Group();
-
-    let stemGeometry = new THREE.CylinderGeometry(0.1, 0.1, 2, 64);
-    let stemMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
-    let stem = new THREE.Mesh(stemGeometry, stemMaterial);
-    stem.position.y = 1;
-    flower.add(stem);
-
-    let leafGeometry = new THREE.PlaneGeometry(1, 0.5);
-    let leafMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22, side: THREE.DoubleSide });
-    for (let i = 0; i < 2; i++) {
-        let leaf = new THREE.Mesh(leafGeometry, leafMaterial);
-        leaf.position.set(0.5, 0.5, 0);
-        leaf.rotation.set(Math.PI / 6, Math.PI / 3 * i, 0);
-        flower.add(leaf);
-    }
-
-    let petalGeometry = new THREE.PlaneGeometry(0.7, 1.5);
-    let petalMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-    for (let i = 0; i < 12; i++) {
-        let petal = new THREE.Mesh(petalGeometry, petalMaterial);
-        petal.position.y = 2;
-        petal.rotation.z = (i * Math.PI / 6);
-        flower.add(petal);
-    }
-
-    let centerGeometry = new THREE.SphereGeometry(0.3, 64, 64);
-    let centerMaterial = new THREE.MeshLambertMaterial({ color: 0xffff00 });
-    let center = new THREE.Mesh(centerGeometry, centerMaterial);
-    center.position.y = 2;
-    flower.add(center);
-
-    return flower;
-}
-
-function growFlower(flower) {
-    new TWEEN.Tween(flower.scale)
-        .to({ x: 1, y: 1, z: 1 }, 2000)
-        .easing(TWEEN.Easing.Elastic.Out)
-        .start();
-}
-
-function animate() {
-    requestAnimationFrame(animate);
-    TWEEN.update();
-    scrollFlowers();
-    windEffect();
-    renderer.render(scene, camera);
-}
-
-function scrollFlowers() {
-    flowers.forEach(flower => {
-        flower.position.z -= scrollSpeed;
-        if (flower.position.z < -5) {
-            flower.position.z = Math.random() * 10 + 10;
-            flower.position.x = (Math.random() - 0.5) * window.innerWidth / 10;
-            flower.position.y = (Math.random() - 0.5) * window.innerHeight / 10;
+      for (let i = 0; i < spirals.length; i++) {
+        for (let j = 0; j < spirals.length; j++) {
+          if (i !== j && collideSpirals(spirals[i], spirals[j])) {
+            // Magnificent visual effect when spirals collide
+            spirals[i].size += 1;
+            spirals[i].hue = (spirals[i].hue + 10) % 255;
+          }
         }
-    });
-}
+        drawSpiral(spirals[i], smoothDisplay);
+      }
+    }
 
-function windEffect() {
-    flowers.forEach(flower => {
-        flower.children.forEach((child, index) => {
-            if (index > 1) { // skip stem and center
-                child.rotation.z += 0.005 * Math.sin(Date.now() * 0.001 + index);
-            }
-        });
-    });
-}
+    function setupGui() {
+      gui.add(guiParams, 'size', 5, 20).name('Size');
+      gui.add(guiParams, 'shape', 2, 10).name('Shape');
+      gui.add(guiParams, 'rotationSpeed', 0.01, 0.1).name('Rotation Speed');
+      gui.add(guiParams, 'loopDensity', 0.1, 2).name('Loop Density');
+      gui.add(guiParams, 'minFramerate', 1, 60).name('Min Framerate');
+    }
 
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
+    function drawSpiral(spiral, smoothDisplay) {
+      let dotNumber = spiral.dotNumber;
+      let rotationSpeed = guiParams.rotationSpeed * rotationDirection;
+      let size = spiral.size;
+      let shape = guiParams.shape;
+      let loopDensity = guiParams.loopDensity;
 
-flowers.forEach(flower => {
-    flower.scale.set(0, 0, 0);
-    growFlower(flower);
-});
+      shape = shape + 110;
 
-setInterval(() => {
-    flowers.forEach(flower => {
-        flower.scale.set(0, 0, 0);
-        growFlower(flower);
-    });
-}, 5000);
+      let angle = dotNumber * shape;
 
-    </script>
+      let radius = sqrt(dotNumber) * scale;
+
+      let x = radius * sin(angle) + spiral.centerX;
+      let y = radius * cos(angle) + spiral.centerY;
+
+      fill(spiral.hue, 255, 255);
+      noStroke();
+      ellipse(x, y, size);
+
+      if (smoothDisplay || deltaTime < 1 / guiParams.minFramerate) {
+        spiral.trail.push({ x: x, y: y, hue: spiral.hue });
+      }
+
+      drawTrail(spiral.trail, size);
+
+      dotNumber += rotationSpeed * loopDensity;
+      if (dotNumber > totalNumberOfDots) {
+        dotNumber = 0;
+        spiral.trail = [];
+      }
+
+      spiral.dotNumber = dotNumber;
+    }
+
+    function drawTrail(trail, size) {
+      for (let i = 0; i < trail.length; i++) {
+        let alpha = map(i, 0, trail.length, 255, 0);
+        fill(trail[i].hue, 255, 255, alpha);
+        noStroke();
+        ellipse(trail[i].x, trail[i].y, size);
+      }
+
+      if (trail.length > 1000) {
+        trail.splice(0, 1);
+      }
+    }
+
+    function collideSpirals(spiral1, spiral2) {
+      let distance = dist(spiral1.centerX, spiral1.centerY, spiral2.centerX, spiral2.centerY);
+      let combinedRadius = spiral1.size / 2 + spiral2.size / 2;
+      return distance < combinedRadius;
+    }
+
+    function mousePressed() {
+      let newSpiral = {
+        centerX: mouseX,
+        centerY: mouseY,
+        dotNumber: 0,
+        size: guiParams.size,
+        hue: random(255),
+        trail: []
+      };
+      spirals.push(newSpiral);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
 </body>
 </html>
+
